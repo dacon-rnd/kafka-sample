@@ -1,0 +1,133 @@
+version: '3'
+services:
+  zookeeper:
+    image: 'zookeeper:3.8'
+    networks:
+      - dacon_network
+    ports:
+      - '2181:2181'
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+      - ZOO_TLS_CLIENT_AUTH=none
+      - ZOO_TLS_QUORUM_CLIENT_AUTH=none
+  kafka-1:
+    image: 'bitnami/kafka:3.6'
+    networks:
+      - dacon_network
+    ports:
+      - '9092:9092'
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_LISTENERS=LC://kafka-1:29092,LX://kafka-1:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=LC://kafka-1:29092,LX://${DOCKER_HOST_IP:-localhost}:9092
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=LC:PLAINTEXT,LX:PLAINTEXT
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=LC
+    depends_on:
+      - zookeeper
+  kafka-2:
+    image: 'bitnami/kafka:3.6'
+    networks:
+      - dacon_network
+    ports:
+      - '9093:9092'
+    environment:
+      - KAFKA_BROKER_ID=2
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_LISTENERS=LC://kafka-2:29093,LX://kafka-2:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=LC://kafka-2:29093,LX://${DOCKER_HOST_IP:-localhost}:9093
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=LC:PLAINTEXT,LX:PLAINTEXT
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=LC
+    depends_on:
+      - zookeeper
+  kafka-3:
+    image: 'bitnami/kafka:3.6'
+    networks:
+      - dacon_network
+    ports:
+      - '9094:9092'
+    environment:
+      - KAFKA_BROKER_ID=3
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_LISTENERS=LC://kafka-3:29094,LX://kafka-3:9094
+      - KAFKA_CFG_ADVERTISED_LISTENERS=LC://kafka-3:29094,LX://${DOCKER_HOST_IP:-localhost}:9094
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=LC:PLAINTEXT,LX:PLAINTEXT
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=LC
+    depends_on:
+      - zookeeper
+#  kafka:
+#    image: 'bitnami/kafka:3.6'
+#    networks:
+#      - dacon_network
+#    ports:
+#      - '9092:9092'
+#    environment:
+#      - KAFKA_BROKER_ID=1
+#      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+#      - ALLOW_PLAINTEXT_LISTENER=yes
+#      - KAFKA_CFG_LISTENERS=LC://kafka:29092,LX://kafka:9092
+#      - KAFKA_CFG_ADVERTISED_LISTENERS=LC://kafka:29092,LX://${DOCKER_HOST_IP:-localhost}:9092
+#      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=LC:PLAINTEXT,LX:PLAINTEXT
+#      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=LC
+#    depends_on:
+#      - zookeeper
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui
+    container_name: kafka-ui
+    networks:
+      - dacon_network
+    ports:
+      - "8989:8080"
+    restart: always
+    depends_on:
+      - kafka-1
+      - kafka-2
+      - kafka-3
+      - zookeeper
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka-1:29092,kafka-2:29093,kafka-3:29094
+      - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2181
+
+  logging-service:
+    image: work-management-logging-service:0.0.2-SNAPSHOT
+    networks:
+      - dacon_network
+    restart: always
+    depends_on:
+      - kafka-1
+      - kafka-2
+      - kafka-3
+      - zookeeper
+    environment:
+      - KAFKA_CLUSTERS_BOOTSTRAPSERVERS=kafka-1:29092,kafka-2:29093,kafka-3:29094
+      - LOGGING_TOPIC=dacon.logging.out.stdout
+
+  todo-service:
+    image: work-management-todo-service:0.0.6-SNAPSHOT
+    networks:
+      - dacon_network
+    ports:
+      - "8081:8080"
+    environment:
+      - SERVICE_EMAIL_URL=http://email-service:8080
+      - KAFKA_CLUSTERS_BOOTSTRAPSERVERS=kafka-1:29092,kafka-2:29093,kafka-3:29094
+      - LOGGING_TOPIC=dacon.logging.out.stdout
+
+  email-service:
+    image: work-management-email-service:0.0.1-SNAPSHOT
+    networks:
+      - dacon_network
+    ports:
+      - "8082:8080"
+    environment:
+      - KAFKA_CLUSTERS_BOOTSTRAPSERVERS=kafka-1:29092,kafka-2:29093,kafka-3:29094
+      - LOGGING_TOPIC=dacon.logging.out.stdout
+
+networks:
+  dacon_network:
+    driver: bridge

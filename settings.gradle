@@ -1,0 +1,6 @@
+rootProject.name = 'work-management'
+
+include 'todo-service'
+include 'email-service'
+include 'logging-service'
+include 'common'
